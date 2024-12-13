@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket测试</title>
+</head>
+<body>
+    <h1>WebSocket测试页面</h1>
+    <div id="messages"></div>
+    <input type="text" id="messageInput" placeholder="输入消息">
+    <button onclick="sendMessage()">发送</button>
+
+    <script>
+        const messagesDiv = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        
+        // 使用相对路径，自动适应当前域名和协议
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}/ws/chat/`);
+
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            const message = document.createElement('div');
+            message.textContent = data.message;
+            messagesDiv.appendChild(message);
+        };
+
+        ws.onopen = function() {
+            console.log('WebSocket连接已建立');
+            // 添加连接成功的提示
+            const message = document.createElement('div');
+            message.textContent = '已连接到服务器';
+            message.style.color = 'green';
+            messagesDiv.appendChild(message);
+        };
+
+        ws.onerror = function(error) {
+            console.error('WebSocket错误：', error);
+            // 添加错误提示
+            const message = document.createElement('div');
+            message.textContent = '连接错误！';
+            message.style.color = 'red';
+            messagesDiv.appendChild(message);
+        };
+
+        ws.onclose = function() {
+            console.log('WebSocket连接已关闭');
+            // 添加连接关闭提示
+            const message = document.createElement('div');
+            message.textContent = '连接已关闭';
+            message.style.color = 'orange';
+            messagesDiv.appendChild(message);
+        };
+
+        function sendMessage() {
+            if (ws.readyState === WebSocket.OPEN) {
+                const message = messageInput.value;
+                if (message.trim()) {
+                    ws.send(JSON.stringify({
+                        'message': message
+                    }));
+                    messageInput.value = '';
+                    
+                    // 显示发送的消息
+                    const messageElement = document.createElement('div');
+                    messageElement.textContent = `发送: ${message}`;
+                    messageElement.style.color = 'blue';
+                    messagesDiv.appendChild(messageElement);
+                }
+            } else {
+                alert('WebSocket连接未建立！');
+            }
+        }
+
+        // 添加回车发送功能
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+
+    <style>
+        #messages {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            height: 300px;
+            overflow-y: auto;
+        }
+        #messageInput {
+            padding: 5px;
+            width: 300px;
+        }
+        button {
+            padding: 5px 15px;
+            margin-left: 10px;
+        }
+        #messages div {
+            margin: 5px 0;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+    </style>
+</body>
+</html> 

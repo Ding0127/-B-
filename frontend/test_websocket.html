@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket 测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+        .log-container {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 10px 0;
+            background: #f9f9f9;
+        }
+        .control-panel {
+            margin: 20px 0;
+        }
+        button {
+            padding: 8px 15px;
+            margin-right: 10px;
+        }
+        input {
+            padding: 8px;
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebSocket 测试页面</h1>
+    
+    <div class="status" id="connection-status">未连接</div>
+    
+    <div class="control-panel">
+        <input type="text" id="ws-url" value="ws://localhost:8001/ws/chat/" placeholder="WebSocket URL">
+        <button onclick="connect()">连接</button>
+        <button onclick="disconnect()">断开</button>
+    </div>
+
+    <div class="control-panel">
+        <input type="text" id="message" placeholder="输入要发送的消息">
+        <button onclick="sendMessage()">发送</button>
+    </div>
+
+    <h3>日志:</h3>
+    <div class="log-container" id="log"></div>
+
+    <script>
+        let ws = null;
+        const statusDiv = document.getElementById('connection-status');
+        const logDiv = document.getElementById('log');
+
+        function log(message, isError = false) {
+            const entry = document.createElement('div');
+            entry.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
+            if (isError) {
+                entry.style.color = 'red';
+            }
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStatus(message, isError = false) {
+            statusDiv.textContent = message;
+            statusDiv.className = 'status ' + (isError ? 'error' : 'success');
+        }
+
+        function connect() {
+            if (ws) {
+                log('已经存在连接，请先断开');
+                return;
+            }
+
+            const url = document.getElementById('ws-url').value;
+            try {
+                ws = new WebSocket(url);
+                log(`正在连接到 ${url}...`);
+
+                ws.onopen = function() {
+                    updateStatus('已连接');
+                    log('连接成功');
+                };
+
+                ws.onclose = function(event) {
+                    if (event.wasClean) {
+                        log(`连接已关闭: code=${event.code}, reason=${event.reason}`);
+                    } else {
+                        log('连接异常断开', true);
+                    }
+                    updateStatus('未连接', true);
+                    ws = null;
+                };
+
+                ws.onerror = function(error) {
+                    log('WebSocket错误: ' + error, true);
+                    updateStatus('连接错误', true);
+                };
+
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        log('收到消息: ' + JSON.stringify(data));
+                    } catch (e) {
+                        log('收到消息: ' + event.data);
+                    }
+                };
+
+            } catch (error) {
+                log('创建WebSocket失败: ' + error, true);
+                updateStatus('连接失败', true);
+            }
+        }
+
+        function disconnect() {
+            if (!ws) {
+                log('没有活动的连接');
+                return;
+            }
+            ws.close();
+        }
+
+        function sendMessage() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('没有活动的连接，无法发送消息', true);
+                return;
+            }
+
+            const messageInput = document.getElementById('message');
+            const message = messageInput.value;
+            
+            try {
+                ws.send(JSON.stringify({
+                    'message': message
+                }));
+                log('已发送: ' + message);
+                messageInput.value = '';
+            } catch (error) {
+                log('发送失败: ' + error, true);
+            }
+        }
+
+        // 支持按回车发送消息
+        document.getElementById('message').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html> 
