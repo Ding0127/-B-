@@ -178,7 +178,7 @@
             margin: 0 auto;
             overflow-y: scroll;
             flex: 1;
-            padding: 20px 20px 120px 20px;
+            padding: 20px;
             position: relative;
             background: #fff;
             border-radius: 10px;
@@ -195,26 +195,6 @@
             font-size: 14px;
             text-align: center;
             margin: 8px 0;
-        }
-
-        /* 添加状态显示区域的样式 */
-        .status-container {
-            position: fixed;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            z-index: 101;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .status-container.show {
-            opacity: 1;
         }
     </style>
 </head>
@@ -242,18 +222,13 @@
     <footer>© 2024</footer>
 
     <script>
-        // 修改状态显示区域的创建方式
+        // 添加状态显示区域
         const statusDiv = document.createElement('div');
-        statusDiv.className = 'status-container';
-        document.body.appendChild(statusDiv);
+        statusDiv.style.margin = '10px';
+        document.querySelector('.container').appendChild(statusDiv);
 
         function updateStatus(message) {
             statusDiv.textContent = message;
-            statusDiv.classList.add('show');
-            // 3秒后隐藏状态消息
-            setTimeout(() => {
-                statusDiv.classList.remove('show');
-            }, 3000);
             console.log(message);
         }
 
@@ -335,7 +310,7 @@
                         }));
                         updateStatus('正在处理BVID...');
                     } catch (error) {
-                        updateStatus('发送��息失败: ' + error.message);
+                        updateStatus('发送消息失败: ' + error.message);
                     }
                     messageInputDom.value = '';
                 };

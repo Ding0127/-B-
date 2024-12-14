@@ -2,11 +2,54 @@ import time
 import requests
 import csv
 import os
+import sqlite3
 from fake_useragent import UserAgent
 
-# 创建保存CSV的目录
-CSV_DIR = os.path.join('data', 'csv_comment')
+# 创建保存CSV和DB的目录
+CSV_DIR = os.path.join("data", "csv_comment")
+DB_DIR = os.path.join("data", "db_comment")
 os.makedirs(CSV_DIR, exist_ok=True)
+os.makedirs(DB_DIR, exist_ok=True)
+
+
+def save_to_db(comments_data, oid):
+    db_path = os.path.join(DB_DIR, f"{oid}.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # 创建评论表
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            video_id TEXT,
+            message TEXT,
+            created_time TEXT,
+            likes INTEGER,
+            location TEXT
+        )
+    """
+    )
+
+    # 插入数据
+    for comment in comments_data:
+        cursor.execute(
+            """
+            INSERT INTO comments (video_id, message, created_time, likes, location)
+            VALUES (?, ?, ?, ?, ?)
+        """,
+            (
+                oid,
+                comment["message"],
+                comment["created_time"],
+                comment["likes"],
+                comment["location"],
+            ),
+        )
+
+    conn.commit()
+    conn.close()
+
 
 def get_bilibili_comments(cookie, oid):
     url_template = "https://api.bilibili.com/x/v2/reply/main?csrf=40a227fcf12c380d7d3c81af2cd8c5e8&mode=3&next={}&oid={}&plat=1&type=1"
@@ -53,15 +96,17 @@ def get_bilibili_comments(cookie, oid):
         else:
             pre_comment_length = len(comments_data)
 
-    # 修改CSV保存路径
+    # 保存CSV
     csv_path = os.path.join(CSV_DIR, f"{oid}.csv")
     with open(csv_path, "w", encoding="utf-8", newline="") as csvfile:
         fieldnames = ["created_time", "message", "likes", "location"]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-
         writer.writeheader()
         for comment in comments_data:
             writer.writerow(comment)
+
+    # 保存到数据库
+    save_to_db(comments_data, oid)
 
     return comments_data
 

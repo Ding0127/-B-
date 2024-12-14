@@ -2,12 +2,19 @@ import json
 from channels.generic.websocket import WebsocketConsumer
 from .swarm import get_bilibili_comments
 from .prompt import CommentAnalyzer
+from .sql_prompt import SQLQueryGenerator
+from .excecute_sql import SQLExecutor
+from .extract_prompt import CommentQA
 
 
 class ChatConsumer(WebsocketConsumer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.analyzer = CommentAnalyzer()
+        self.sql_generator = SQLQueryGenerator()
+        self.sql_executor = SQLExecutor()
+        self.comment_qa = CommentQA()
+        self.current_bvid = None
 
     def connect(self):
         self.accept()
@@ -23,17 +30,65 @@ class ChatConsumer(WebsocketConsumer):
 
     def format_analysis_result(self, result):
         """格式化分析结果为HTML格式"""
-        sections = result.split('\n')
+        sections = result.split("\n")
         formatted_sections = []
-        
+
+        current_section = None
+
         for section in sections:
             if section.strip():
-                if section.startswith(('1.', '2.', '3.', '4.')):
-                    formatted_sections.append(f'<strong>{section}</strong>')
+                # 处理主要标题（1. 2. 3. 4.开头的）
+                if section.startswith(("1.", "2.", "3.", "4.")):
+                    current_section = section.split(".")[0]
+                    formatted_sections.append(
+                        f'<br><strong style="color: #2c3e50; font-size: 16px;">{section}</strong><br>'
+                    )
+                # 处理支持证据中的小点（- 开头的）
+                elif section.strip().startswith("-"):
+                    bullet_content = section.strip()[1:].strip()  # 移除 '-' 并清理空格
+                    formatted_sections.append(
+                        f'<div style="margin-left: 20px; margin-top: 5px;">'
+                        f"• {bullet_content}"
+                        f"</div>"
+                    )
+                # 普通段落
                 else:
-                    formatted_sections.append(section)
-        
-        return '<br>'.join(formatted_sections)
+                    style = ""
+                    if current_section == "2":  # 详细分析部分使用缩进
+                        style = 'style="margin-left: 15px; margin-top: 5px;"'
+                    elif current_section == "4":  # 总结建议部分使用特殊样式
+                        style = 'style="margin-left: 15px; margin-top: 5px; color: #34495e;"'
+                    formatted_sections.append(f"<div {style}>{section}</div>")
+
+        # 在各大部分之间添加额外的空行
+        return "<br>".join(formatted_sections)
+
+    def format_sql_results(self, results):
+        """格式化 SQL 查询结果为 HTML 表格"""
+        if not results:
+            return "查询结果为空"
+
+        # 获取表头（字段名）
+        headers = results[0].keys()
+
+        # 构建 HTML 表格
+        html = ['<table border="1" style="border-collapse: collapse;">']
+
+        # 添加表头
+        html.append("<tr>")
+        for header in headers:
+            html.append(f'<th style="padding: 8px;">{header}</th>')
+        html.append("</tr>")
+
+        # 添加数据行
+        for row in results:
+            html.append("<tr>")
+            for header in headers:
+                html.append(f'<td style="padding: 8px;">{row[header]}</td>')
+            html.append("</tr>")
+
+        html.append("</table>")
+        return "".join(html)
 
     def receive(self, text_data):
         try:
@@ -41,6 +96,7 @@ class ChatConsumer(WebsocketConsumer):
             message = text_data_json.get("message", "")
 
             if message.startswith("BV"):
+                self.current_bvid = message
                 # 发送开始爬取的消息
                 self.send(
                     text_data=json.dumps(
@@ -66,17 +122,13 @@ class ChatConsumer(WebsocketConsumer):
 
                     # 发送正在分析的提示
                     self.send(
-                        text_data=json.dumps(
-                            {
-                                "message": "正在分析全部评论，请稍候..."
-                            }
-                        )
+                        text_data=json.dumps({"message": "正在分析全部评论，请稍候..."})
                     )
 
                     # 分析评论
                     analysis_result = self.analyzer.analyze_comments(message)
                     formatted_result = self.format_analysis_result(analysis_result)
-                    
+
                     # 发送分析结果
                     self.send(
                         text_data=json.dumps(
@@ -86,16 +138,80 @@ class ChatConsumer(WebsocketConsumer):
                         )
                     )
 
+                    # 添加询问下一步分析的消息
+                    self.send(
+                        text_data=json.dumps(
+                            {"message": "是否要对评论进行下一步分析？请输入你的问题"}
+                        )
+                    )
+
                 except Exception as e:
                     self.send(
                         text_data=json.dumps({"message": f"处理评论时出错：{str(e)}"})
                     )
             else:
-                self.send(
-                    text_data=json.dumps(
-                        {"message": "请输入正确的BVID格式（以BV开头）"}
+                if self.current_bvid:
+                    # 生成 SQL 查询
+                    sql_query = self.sql_generator.generate_sql_query(
+                        self.current_bvid, message
                     )
-                )
+
+                    # 发送 SQL 查询消息
+                    self.send(
+                        text_data=json.dumps(
+                            {
+                                "message": f"即将执行以下SQL查询：<br><pre>{sql_query}</pre>"
+                            }
+                        )
+                    )
+
+                    try:
+                        # 执行 SQL 查询
+                        results = self.sql_executor.execute_query(
+                            self.current_bvid, sql_query
+                        )
+
+                        # 格式化并发送结果
+                        formatted_results = self.format_sql_results(results)
+                        self.send(
+                            text_data=json.dumps(
+                                {"message": f"查询结果：<br>{formatted_results}"}
+                            )
+                        )
+
+                        # 发送正在生成答案的提示
+                        self.send(
+                            text_data=json.dumps({"message": "正在生成答案，请稍候..."})
+                        )
+
+                        # 使用 CommentQA 生成答案
+                        answer = self.comment_qa.answer_question(
+                            self.current_bvid, message
+                        )
+                        formatted_answer = self.format_analysis_result(answer)
+                        self.send(
+                            text_data=json.dumps(
+                                {"message": f"<br>问题分析：<br>{formatted_answer}"}
+                            )
+                        )
+
+                        # 询问是否继续分析
+                        self.send(
+                            text_data=json.dumps(
+                                {"message": "是否要继续分析？请输入你的问题"}
+                            )
+                        )
+
+                    except Exception as e:
+                        self.send(
+                            text_data=json.dumps(
+                                {"message": f"执行查询时发生错误：{str(e)}"}
+                            )
+                        )
+                else:
+                    self.send(
+                        text_data=json.dumps({"message": "请先输入要分析的视频BVID"})
+                    )
 
         except json.JSONDecodeError:
             self.send(text_data=json.dumps({"message": "无效的消息格式"}))
