@@ -43,6 +43,27 @@
             padding: 8px;
             width: 300px;
         }
+        #messages {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #fff;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        #messages div {
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+        #messages strong {
+            color: #2c3e50;
+        }
+        #messages br {
+            display: block;
+            margin: 5px 0;
+            content: "";
+        }
     </style>
 </head>
 <body>
@@ -63,6 +84,9 @@
 
     <h3>日志:</h3>
     <div class="log-container" id="log"></div>
+
+    <h3>消息记录:</h3>
+    <div id="messages"></div>
 
     <script>
         let ws = null;
@@ -118,9 +142,16 @@
                 ws.onmessage = function(event) {
                     try {
                         const data = JSON.parse(event.data);
-                        log('收到消息: ' + JSON.stringify(data));
+                        log('收到消息');
+                        
+                        const messageDiv = document.createElement('div');
+                        messageDiv.innerHTML = data.message;
+                        
+                        const messagesDiv = document.getElementById('messages');
+                        messagesDiv.appendChild(messageDiv);
+                        messagesDiv.scrollTop = messagesDiv.scrollHeight;
                     } catch (e) {
-                        log('收到消息: ' + event.data);
+                        log('消息解析错误: ' + e, true);
                     }
                 };
 
