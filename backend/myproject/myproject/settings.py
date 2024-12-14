@@ -42,7 +42,7 @@ INSTALLED_APPS = [
     "corsheaders",
 ]
 # 添加以下配置
-ASGI_APPLICATION = 'myproject.asgi.application'
+ASGI_APPLICATION = "myproject.asgi.application"
 
 CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
 

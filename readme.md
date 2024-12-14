@@ -12,4 +12,4 @@ http://127.0.0.1:8000/
 websocket resnet api 是什么
 
 
-daphne myproject.asgi:application -b 0.0.0.0 --p 8000
+daphne -b 0.0.0.0 -p 8002 myproject.asgi:application

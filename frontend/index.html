@@ -108,13 +108,44 @@
         }
 
         .message {
-            background: white;
             padding: 12px 16px;
             margin: 8px 0;
             border-radius: 8px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            max-width: 80%;
+            max-width: 70%;
             word-wrap: break-word;
+            clear: both;
+            position: relative;
+        }
+
+        .user-message {
+            background: #007AFF;
+            color: white;
+            float: right;
+            margin-right: 20px;
+            border-radius: 8px 8px 0 8px;
+        }
+
+        .bot-message {
+            background: white;
+            color: #333;
+            float: left;
+            margin-left: 20px;
+            border-radius: 8px 8px 8px 0;
+        }
+
+        .messages-container {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            overflow-y: auto;
+            flex: 1;
+            padding: 20px;
+        }
+
+        .message-wrapper {
+            overflow: hidden;
+            margin-bottom: 10px;
         }
 
         .status {
@@ -133,6 +164,7 @@
 
     <div class="container">
         <div class="welcome-text">你好，我是B站评论聊天机器人，请输入BVID</div>
+        <div class="messages-container"></div>
         <div class="input-area">
             <input 
                 type="text" 
@@ -148,7 +180,7 @@
     <footer>© 2024</footer>
 
     <script>
-        // 添加��态显示区域
+        // 添加状态显示区域
         const statusDiv = document.createElement('div');
         statusDiv.style.margin = '10px';
         document.querySelector('.container').appendChild(statusDiv);
@@ -190,13 +222,14 @@
                     const data = JSON.parse(e.data);
                     console.log('收到消息:', data);
                     // 添加消息显示区域
+                    const messageWrapper = document.createElement('div');
+                    messageWrapper.className = 'message-wrapper';
                     const messagesDiv = document.createElement('div');
-                    messagesDiv.className = 'message';
+                    messagesDiv.className = 'message bot-message';
                     messagesDiv.textContent = data.message;
-                    document.querySelector('.container').insertBefore(
-                        messagesDiv, 
-                        document.querySelector('.input-area')
-                    );
+                    messageWrapper.appendChild(messagesDiv);
+                    document.querySelector('.messages-container').appendChild(messageWrapper);
+                    messagesDiv.scrollIntoView({ behavior: 'smooth' });
                     updateStatus('收到消息');
                 };
 
@@ -219,6 +252,16 @@
                         updateStatus('请输入BVID');
                         return;
                     }
+                    // 添加用户消息到界面
+                    const messageWrapper = document.createElement('div');
+                    messageWrapper.className = 'message-wrapper';
+                    const userMessageDiv = document.createElement('div');
+                    userMessageDiv.className = 'message user-message';
+                    userMessageDiv.textContent = message;
+                    messageWrapper.appendChild(userMessageDiv);
+                    document.querySelector('.messages-container').appendChild(messageWrapper);
+                    userMessageDiv.scrollIntoView({ behavior: 'smooth' });
+
                     try {
                         chatSocket.send(JSON.stringify({
                             'message': message
